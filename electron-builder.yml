@@ -1,0 +1,59 @@
+appId: com.discordlite.desktop
+productName: discord-lite
+copyright: discord-lite
+
+directories:
+  output: dist-desktop
+  buildResources: build
+
+# Внутри приложения — только код Electron-клиента.
+# Веб-приложение (Next.js, Express, Prisma) живёт на сервере и в установщик не попадает.
+files:
+  - desktop/**/*
+  - build/icon.ico
+  - build/icon.png
+  - package.json
+  - "!**/node_modules/**/*"
+  - "!**/*.map"
+
+extraMetadata:
+  main: desktop/main.js
+
+asar: true
+
+# Используем уже скачанный Electron из node_modules — без повторной загрузки.
+electronDist: node_modules/electron/dist
+compression: normal
+npmRebuild: false
+buildDependenciesFromSource: false
+
+afterPack: scripts/after-pack.js
+
+win:
+  # Иконку и версию вписываем сами в afterPack (см. scripts/after-pack.js).
+  # Штатная подпись тянет winCodeSign с macOS-симлинками и падает без прав администратора.
+  signAndEditExecutable: false
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  icon: build/icon.ico
+  artifactName: discord-lite-${version}-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: discord-lite
+  uninstallDisplayName: discord-lite
+  deleteAppDataOnUninstall: false
+  artifactName: discord-lite-setup-${version}.exe
+
+portable:
+  artifactName: discord-lite-portable-${version}.exe

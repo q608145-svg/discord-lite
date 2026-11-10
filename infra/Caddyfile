@@ -1,0 +1,11 @@
+# Замените chat.example.com на ваш домен и настройте A-запись на IP сервера.
+# Caddy сам выпустит HTTPS-сертификат.
+
+{$CHAT_DOMAIN:chat.example.com} {
+	encode zstd gzip
+
+	reverse_proxy app:3000 {
+		# WebSocket для чата (socket.io)
+		header_up X-Forwarded-Proto {scheme}
+	}
+}

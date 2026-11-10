@@ -1,0 +1,25 @@
+# LiveKit для локальной разработки на Windows (без Docker).
+# Запуск: tools\livekit\livekit-server.exe --config infra/livekit.local.yaml
+# В .env должно быть: LIVEKIT_URL=ws://localhost:7880, ключи devkey / secret.
+
+port: 7880
+
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  # Для локальной сети оставляем false: сервер отдаёт свои реальные адреса.
+  # Если запускаете на VPS за NAT — поставьте true.
+  use_external_ip: false
+
+keys:
+  devkey: secret
+
+room:
+  auto_create: true
+  empty_timeout: 300
+  departure_timeout: 20
+
+logging:
+  level: info
+  json: false

@@ -1,0 +1,33 @@
+# Blueprint Render: веб-сервис discord-lite.
+# Применение: Render Dashboard → New → Blueprint → выбрать репозиторий.
+# Значения sync: false нужно вписать в дашборде при первом деплое
+# (DATABASE_URL, LIVEKIT_*), JWT_SECRET генерируется автоматически.
+
+services:
+  - type: web
+    name: discord-lite
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    # --include=dev обязателен: на Render NODE_ENV=production, иначе npm ci
+    # не поставит typescript/prisma, нужные для сборки.
+    buildCommand: npm ci --include=dev && npx prisma db push --skip-generate && npm run build
+    startCommand: node server/index.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false

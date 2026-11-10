@@ -1,0 +1,19 @@
+# LiveKit для discord-lite.
+# Ключи лучше задать через переменную окружения LIVEKIT_KEYS (см. docker-compose.yml).
+port: 7880
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  # Если сервер за NAT — раскомментируйте и укажите внешний IP:
+  # use_external_ip: true
+room:
+  auto_create: true
+  empty_timeout: 300 # секунд, комната живёт 5 минут после выхода последнего
+turn:
+  enabled: true
+  # TURN нужен, если у кого-то не проходит UDP (частая ситуация в мобильных сетях).
+  domain: turn.local
+  tls_port: 5349
+  udp_port: 3478
+keys: {}

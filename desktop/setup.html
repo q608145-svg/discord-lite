@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"
+    />
+    <title>discord-lite — подключение</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #1e1f22;
+        --panel: #2b2d31;
+        --input: #1e1f22;
+        --accent: #5865f2;
+        --text: #f2f3f5;
+        --muted: #949ba4;
+        --ok: #23a55a;
+        --danger: #ed4245;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(800px 400px at 15% 0%, #3b3f8f 0%, transparent 60%),
+          radial-gradient(700px 400px at 100% 100%, #7a2f5c 0%, transparent 60%),
+          var(--bg);
+        color: var(--text);
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+        display: flex;
+        flex-direction: column;
+        padding: 28px;
+        -webkit-app-region: drag;
+      }
+
+      header { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+
+      .logo {
+        width: 44px; height: 44px; border-radius: 12px;
+        background: linear-gradient(180deg, #6e7aff, #4752c4);
+        display: grid; place-items: center;
+        font-weight: 800; font-size: 22px;
+      }
+
+      h1 { font-size: 20px; margin: 0 0 2px; }
+      .sub { color: var(--muted); font-size: 13px; margin: 0; }
+
+      main { -webkit-app-region: no-drag; }
+
+      label {
+        display: block; font-size: 11px; font-weight: 700;
+        letter-spacing: 0.04em; text-transform: uppercase;
+        color: var(--muted); margin-bottom: 8px;
+      }
+
+      input[type="url"] {
+        width: 100%; padding: 12px 14px; border-radius: 6px;
+        border: 1px solid #111214; background: var(--input);
+        color: var(--text); font-size: 15px; outline: none;
+      }
+
+      input[type="url"]:focus { border-color: var(--accent); }
+
+      .hint { color: var(--muted); font-size: 12px; margin: 8px 0 18px; line-height: 1.5; }
+
+      .status { min-height: 22px; font-size: 13px; margin-bottom: 10px; }
+      .status.ok { color: var(--ok); }
+      .status.err { color: #f8b4b4; }
+
+      .row { display: flex; gap: 10px; }
+
+      button {
+        font: inherit; border: none; border-radius: 6px; cursor: pointer;
+        padding: 12px 16px; font-weight: 600;
+      }
+
+      button:disabled { opacity: 0.55; cursor: progress; }
+
+      .primary { background: var(--accent); color: #fff; flex: 1; }
+      .primary:hover:not(:disabled) { background: #4752c4; }
+      .ghost { background: #313338; color: var(--text); }
+
+      footer {
+        margin-top: auto; padding-top: 16px;
+        color: #6d6f78; font-size: 11px; line-height: 1.5;
+        -webkit-app-region: no-drag;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">D</div>
+      <div>
+        <h1>discord-lite</h1>
+        <p class="sub">Подключение к вашему серверу</p>
+      </div>
+    </header>
+
+    <main>
+      <label for="server">Адрес сервера</label>
+      <input
+        id="server"
+        type="url"
+        spellcheck="false"
+        placeholder="http://localhost:3000"
+        autocomplete="off"
+      />
+      <p class="hint">
+        Это адрес, по которому друзья открывают чат: например
+        <b>https://chat.example.com</b> или <b>http://localhost:3000</b>, если сервер
+        запущен на этом компьютере.
+      </p>
+
+      <div class="status" id="status"></div>
+
+      <div class="row">
+        <button class="ghost" id="check" type="button">Проверить</button>
+        <button class="primary" id="save" type="button">Подключиться</button>
+      </div>
+    </main>
+
+    <footer>
+      Голос и видео работают через LiveKit. Если сервер недоступен — проверьте, что
+      он запущен и порт открыт.
+    </footer>
+
+    <script src="setup.js"></script>
+  </body>
+</html>
