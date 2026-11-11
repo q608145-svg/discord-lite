@@ -10,3 +10,4 @@ dist-desktop/
 .tmp-build/
 .tmp-nsis/
 desktop/server.json
+*.tsbuildinfo

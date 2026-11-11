@@ -4,9 +4,20 @@ import { useEffect, useState } from "react";
 import Avatar from "@/components/Avatar";
 import ChatView from "@/components/ChatView";
 import VoiceStage from "@/components/VoiceStage";
+import { ConfirmDialog, PromptDialog } from "@/components/Dialogs";
 import { api } from "@/lib/api";
 import { disconnectSocket, getSocket } from "@/lib/socket";
 import type { Channel, Guild, Message, User, VoiceParticipant } from "@/lib/types";
+
+type PromptConfig = {
+  title: string;
+  description?: string;
+  label: string;
+  placeholder?: string;
+  submitLabel?: string;
+  maxLength?: number;
+  onSubmit: (value: string) => Promise<void>;
+};
 
 export default function AppShell({ user }: { user: User }) {
   const [guilds, setGuilds] = useState<Guild[]>([]);
@@ -16,6 +27,8 @@ export default function AppShell({ user }: { user: User }) {
   const [voiceMuted, setVoiceMuted] = useState(false);
   const [presence, setPresence] = useState<Record<string, VoiceParticipant[]>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [prompt, setPrompt] = useState<PromptConfig | null>(null);
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   // ------------------------------------------------------------ загрузка
   const reloadGuilds = async () => {
@@ -118,46 +131,46 @@ export default function AppShell({ user }: { user: User }) {
     window.location.reload();
   }
 
-  async function createGuild() {
-    const name = window.prompt("Название сервера:");
-    if (!name?.trim()) return;
-    try {
-      await api("/guilds", { method: "POST", body: JSON.stringify({ name: name.trim() }) });
-      await reloadGuilds();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Ошибка");
-    }
+  function openCreateGuild() {
+    setPrompt({
+      title: "Создать сервер",
+      description: "Сервер — это пространство для вашей компании: свои каналы, история, голос.",
+      label: "Название сервера",
+      placeholder: "Например, «Друзья»",
+      submitLabel: "Создать сервер",
+      maxLength: 48,
+      onSubmit: async (name) => {
+        const res = await api<{ guild: Guild }>("/guilds", {
+          method: "POST",
+          body: JSON.stringify({ name }),
+        });
+        await reloadGuilds();
+        setActiveGuildId(res.guild.id);
+      },
+    });
   }
 
-  async function createChannel() {
+  function openCreateChannel(type: "text" | "voice") {
     if (!activeGuild) return;
-    const name = window.prompt("Название канала (#текстовый):");
-    if (!name?.trim()) return;
-    try {
-      const res = await api<{ channel: Channel }>(
-        `/guilds/${activeGuild.id}/channels`,
-        { method: "POST", body: JSON.stringify({ name: name.trim(), type: "text" }) }
-      );
-      await reloadGuilds();
-      setActiveChannelId(res.channel.id);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Ошибка");
-    }
-  }
-
-  async function createVoiceChannel() {
-    if (!activeGuild) return;
-    const name = window.prompt("Название голосового канала:");
-    if (!name?.trim()) return;
-    try {
-      await api(`/guilds/${activeGuild.id}/channels`, {
-        method: "POST",
-        body: JSON.stringify({ name: name.trim(), type: "voice" }),
-      });
-      await reloadGuilds();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Ошибка");
-    }
+    const isVoice = type === "voice";
+    setPrompt({
+      title: isVoice ? "Создать голосовой канал" : "Создать текстовый канал",
+      description: isVoice
+        ? "В голосовом канале можно разговаривать и показывать экран."
+        : "В текстовом канале хранится история сообщений.",
+      label: "Название канала",
+      placeholder: isVoice ? "Например, «Игры»" : "Например, «мемы»",
+      submitLabel: "Создать канал",
+      maxLength: 32,
+      onSubmit: async (name) => {
+        const res = await api<{ channel: Channel }>(
+          `/guilds/${activeGuild.id}/channels`,
+          { method: "POST", body: JSON.stringify({ name, type }) }
+        );
+        await reloadGuilds();
+        if (!isVoice) setActiveChannelId(res.channel.id);
+      },
+    });
   }
 
   const textChannels = activeGuild?.channels.filter((c) => c.type === "text") ?? [];
@@ -172,7 +185,7 @@ export default function AppShell({ user }: { user: User }) {
       <div className="guild-rail">
         <button
           className={`guild-btn add ${!activeGuild ? "active" : ""}`}
-          onClick={createGuild}
+          onClick={openCreateGuild}
           title="Создать сервер"
         >
           +
@@ -202,7 +215,7 @@ export default function AppShell({ user }: { user: User }) {
           <div className="channel-list">
             <div className="channel-section">
               <span>Текстовые</span>
-              <button onClick={createChannel} title="Создать текстовый канал">
+              <button onClick={() => openCreateChannel("text")} title="Создать текстовый канал">
                 +
               </button>
             </div>
@@ -223,7 +236,7 @@ export default function AppShell({ user }: { user: User }) {
 
             <div className="channel-section">
               <span>Голосовые</span>
-              <button onClick={createVoiceChannel} title="Создать голосовой канал">
+              <button onClick={() => openCreateChannel("voice")} title="Создать голосовой канал">
                 +
               </button>
             </div>
@@ -285,7 +298,7 @@ export default function AppShell({ user }: { user: User }) {
               <div className="name">{user.displayName}</div>
               <div className="tag">@{user.username}</div>
             </div>
-            <button className="icon-btn danger" onClick={logout} title="Выйти">
+            <button className="icon-btn danger" onClick={() => setLogoutOpen(true)} title="Выйти">
               ⏻
             </button>
           </div>
@@ -315,6 +328,31 @@ export default function AppShell({ user }: { user: User }) {
           </div>
         </div>
       )}
+
+      {/* ---------------- диалоги (вместо window.prompt/confirm) ---------------- */}
+      <PromptDialog
+        open={prompt !== null}
+        title={prompt?.title || ""}
+        description={prompt?.description}
+        label={prompt?.label || ""}
+        placeholder={prompt?.placeholder}
+        submitLabel={prompt?.submitLabel}
+        maxLength={prompt?.maxLength}
+        onSubmit={async (value) => {
+          if (prompt) await prompt.onSubmit(value);
+        }}
+        onClose={() => setPrompt(null)}
+      />
+
+      <ConfirmDialog
+        open={logoutOpen}
+        title="Выйти из аккаунта?"
+        description="Серверы и сообщения останутся на месте — понадобится только пароль, чтобы войти снова."
+        confirmLabel="Выйти"
+        danger
+        onConfirm={logout}
+        onClose={() => setLogoutOpen(false)}
+      />
     </div>
   );
 }
