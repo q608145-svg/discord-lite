@@ -194,6 +194,15 @@ LIVEKIT_URL=wss://livekit.вашдомен
 ```powershell
 npm run check:remote -- https://discord-lite-xxxx.onrender.com
 ```
+
+После деплоя адрес зашивается в приложение одной командой:
+
+```powershell
+npm run desktop:bake -- https://discord-lite-xxxx.onrender.com
+```
+
+Она записывает `desktop/server.json` внутрь `app.asar` и пересобирает `.exe`:
+экран подключения у друзей больше не появится.
 ## Десктопное приложение для Windows (Electron)
 
 ![Экран подключения](docs/desktop-setup.png)

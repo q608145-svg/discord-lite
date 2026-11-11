@@ -12,7 +12,8 @@ services:
     branch: main
     # --include=dev обязателен: на Render NODE_ENV=production, иначе npm ci
     # не поставит typescript/prisma, нужные для сборки.
-    buildCommand: npm ci --include=dev && npx prisma db push --skip-generate && npm run build
+    # prisma db push на Neon падает с P1017, поэтому схему применяем своим скриптом.
+    buildCommand: npm ci --include=dev && npx prisma generate && node scripts/db-init.js && npm run build
     startCommand: node server/index.js
     healthCheckPath: /api/health
     autoDeploy: true

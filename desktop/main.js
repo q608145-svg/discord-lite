@@ -31,6 +31,23 @@ const TITLEBAR_HEIGHT = 40;
 const ICON = path.join(__dirname, "..", "build", "icon.ico");
 const IS_WINDOWS = process.platform === "win32";
 
+/**
+ * Адрес сервера, зашитый при сборке (desktop/server.json).
+ * Файл создаёт `npm run desktop:bake -- https://…`: он попадает внутрь app.asar,
+ * поэтому у друзей приложение сразу открывает нужный сервер без экрана настройки.
+ */
+function readBakedServer() {
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, "server.json"), "utf8");
+    const parsed = JSON.parse(raw);
+    return normalizeServerUrl(parsed.serverUrl || parsed.url || "");
+  } catch {
+    return "";
+  }
+}
+
+const BAKED_SERVER = readBakedServer();
+
 let mainWindow = null;
 let setupWindow = null;
 let config = { serverUrl: "", bounds: null };
@@ -61,8 +78,16 @@ function userDataDir() {
 
 function loadConfig() {
   config = readConfig(userDataDir());
+
+  // Приоритет: переменная окружения (отладка) → сохранённый выбор пользователя →
+  // адрес, зашитый при сборке.
   const fromEnv = normalizeServerUrl(process.env.DISCORD_LITE_URL || "");
-  if (fromEnv) config.serverUrl = fromEnv;
+  if (fromEnv) {
+    config.serverUrl = fromEnv;
+  } else if (!config.serverUrl && BAKED_SERVER) {
+    config.serverUrl = BAKED_SERVER;
+  }
+
   return config;
 }
 

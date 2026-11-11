@@ -9,3 +9,4 @@ dist-desktop/
 .eb-cache/
 .tmp-build/
 .tmp-nsis/
+desktop/server.json

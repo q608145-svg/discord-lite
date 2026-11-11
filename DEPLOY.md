@@ -89,7 +89,8 @@ git push -u origin main
 
 3. Сохрани её — это будущий `DATABASE_URL`. Параметр `sslmode=require` обязателен.
 
-Таблицы создавать вручную не нужно: команда `prisma db push` выполнится при сборке на Render.
+Таблицы создавать вручную не нужно: при первом деплое Render выполнит `node scripts/db-init.js` — идемпотентный скрипт, который создаёт таблицы, индексы и внешние ключи.
+> Обычный `prisma db push` с Neon падает с `P1017 Server has closed the connection` (схема-движок Prisma не дружит с каналом-биндингом Neon), поэтому используем свой скрипт.
 
 ---
 
@@ -137,7 +138,7 @@ git push -u origin main
 | Region | Frankfurt (EU Central) |
 | Branch | `main` |
 | Runtime | Node |
-| Build Command | `npm ci --include=dev && npx prisma db push --skip-generate && npm run build` |
+| Build Command | `npm ci --include=dev && npx prisma generate && node scripts/db-init.js && npm run build` |
 | Start Command | `node server/index.js` |
 | Instance Type | **Free** |
 | Health Check Path | `/api/health` |
@@ -161,7 +162,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 > `npm ci --include=dev` обязателен: Render выставляет `NODE_ENV=production`, и без
-> флага npm не поставит `typescript` и `prisma`, нужные для `next build` и `db push`.
+> флага npm не поставит `typescript` и `prisma`, нужные для `next build` и `db-init.js`.
 
 ---
 
@@ -170,7 +171,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 В логах Render по порядку должно быть:
 
 1. `npm ci` — установка зависимостей;
-2. `prisma db push` — `🚀 Your database is now in sync with your Prisma schema`;
+2. `db-init.js` — `Схема готова.` и список таблиц;
 3. `next build` — `Route (app) … ○ /`;
 4. `discord-lite → https://discord-lite-xxxx.onrender.com (порт 10000)`;
 5. `LiveKit: wss://…livekit.cloud`;
@@ -206,6 +207,7 @@ npm run smoke -- https://discord-lite-xxxx.onrender.com
 | Через 15 минут первый запрос висит ~минуту | Render Free засыпает | Это нормально; для друзей можно позже взять план Starter ($7) или пинговать сервис |
 | `P1001: Can't reach database server` | нет `sslmode=require` или неверный хост Neon | взять строку подключения заново, direct-хост |
 | `prisma: command not found` | `npm ci` без `--include=dev` | проверить Build Command |
+| Build падает на `db-init.js` с `P1017` | Neon «спит» | скрипт сам повторяет попытки; если не помогло — перезапустить деплой |
 | `{"ok":true,"livekit":false}` | пустые `LIVEKIT_*` | заполнить переменные и нажать **Manual Deploy → Clear build cache & deploy** |
 | Голос: «could not establish signal connection» | `LIVEKIT_URL` начинается с `https://` или `ws://` | должно быть `wss://…livekit.cloud` |
 | Сообщения не доходят, но API работает | сервис за прокси без WebSocket | Render поддерживает WS из коробки; проверь, что не включён «Static» тип сервиса |
@@ -214,14 +216,43 @@ npm run smoke -- https://discord-lite-xxxx.onrender.com
 
 ---
 
-## Что дальше (шаг 2)
+## Шаг 6. Зашить адрес сервера в .exe
 
-Когда адрес заработает и голос проверится с двух устройств:
+Когда `https://…onrender.com` работает и голос проверен с двух устройств:
 
-1. Зашиваем `https://discord-lite-xxxx.onrender.com` в `desktop/main.js` как
-   `BUNDLED_SERVER`, экран подключения больше не показываем.
-2. Оставляем аварийный выход: `DISCORD_LITE_URL` и скрытое сочетание клавиш для смены
-   сервера, чтобы можно было переехать без пересборки.
-3. Пересобираем `discord-lite-setup-0.1.0.exe` и раздаём друзьям.
+```powershell
+npm run desktop:bake -- https://discord-lite-xxxx.onrender.com
+```
 
-Пришли адрес сервиса и результат `npm run smoke` — перейдём к этому шагу.
+Команда:
+
+1. записывает адрес в `desktop/server.json` (файл попадает внутрь `app.asar`);
+2. пересобирает `dist-desktop\discord-lite-setup-*.exe` и `discord-lite-portable-*.exe`.
+
+У друзей приложение сразу открывает сервер, без экрана настройки. Аварийные выходы:
+
+- `set DISCORD_LITE_URL=https://другой-сервер` перед запуском — разово переопределить адрес;
+- кнопка **⚙ Сервер** в шапке — сменить адрес вручную (сохраняется в профиле пользователя);
+- `npm run desktop:bake -- --clear` — убрать зашитый адрес и вернуть экран подключения.
+
+> После раздачи .exe не меняй домен Render: он зашит в бинарник. Для смены адреса
+> придётся пересобрать установщик (или воспользоваться кнопкой ⚙).
+
+## Проверка ключей LiveKit отдельно
+
+```powershell
+$env:LIVEKIT_URL="wss://…livekit.cloud"
+$env:LIVEKIT_API_KEY="API…"
+$env:LIVEKIT_API_SECRET="…"
+node scripts/livekit-diag.js
+```
+
+Скрипт делает запрос к Twirp API и открывает `/rtc`, как браузер. Если видишь
+`401 invalid API key` — ключ и секрет не от того проекта (или скопированы с ошибкой).
+Проверить нужно в LiveKit Dashboard → нужный проект → Settings → Keys. Секрет
+показывается только при создании ключа: если потерян — создай новый и обнови Render.
+
+## Что дальше
+
+1. Прислать адрес Render — зашьём его в .exe одной командой.
+2. После проверки голоса с двух устройств — раздать `discord-lite-setup-0.1.0.exe` друзьям.

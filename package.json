@@ -18,6 +18,7 @@
     "check:remote": "node scripts/smoke.js",
     "livekit": "tools/livekit/livekit-server.exe --config infra/livekit.local.yaml",
     "livekit:check": "node scripts/livekit-check.js",
+    "livekit:diag": "node scripts/livekit-diag.js",
     "voice:check": "node scripts/voice-e2e.js",
     "pwa:check": "node scripts/pwa-check.js",
     "demo": "node scripts/demo-account.js",
@@ -26,6 +27,7 @@
     "desktop:dev": "electron .",
     "desktop:test": "node scripts/desktop-test.js",
     "desktop:build": "node scripts/desktop-build.js",
+    "desktop:bake": "node scripts/bake-server.js",
     "desktop:portable": "electron-builder --win portable --config electron-builder.yml"
   },
   "prisma": {

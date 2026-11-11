@@ -130,52 +130,89 @@ function createApiRouter({ rooms }) {
 
   // ----------------------------------------------------------- guilds
   api.get("/guilds", requireAuth, async (req, res) => {
-    const members = await prisma.member.findMany({
+    // Несколько простых запросов вместо одного «тяжёлого» include:
+    // так меньше работы внутри одной транзакции и устойчивее к обрывам связи.
+    const memberships = await prisma.member.findMany({
       where: { userId: req.user.id },
-      include: {
-        guild: {
-          include: {
-            channels: { orderBy: { position: "asc" } },
-            _count: { select: { members: true } },
-          },
-        },
-      },
       orderBy: { joinedAt: "asc" },
     });
 
+    const guildIds = memberships.map((m) => m.guildId);
+    if (guildIds.length === 0) return res.json({ guilds: [] });
+
+    const [guilds, channels, allMembers] = await Promise.all([
+      prisma.guild.findMany({ where: { id: { in: guildIds } } }),
+      prisma.channel.findMany({
+        where: { guildId: { in: guildIds } },
+        orderBy: { position: "asc" },
+      }),
+      prisma.member.findMany({
+        where: { guildId: { in: guildIds } },
+        select: { guildId: true },
+      }),
+    ]);
+
+    const channelsByGuild = new Map();
+    for (const channel of channels) {
+      const list = channelsByGuild.get(channel.guildId) || [];
+      list.push(channel);
+      channelsByGuild.set(channel.guildId, list);
+    }
+
+    const memberCounts = new Map();
+    for (const member of allMembers) {
+      memberCounts.set(member.guildId, (memberCounts.get(member.guildId) || 0) + 1);
+    }
+
+    const byId = new Map(guilds.map((g) => [g.id, g]));
     res.json({
-      guilds: members.map((m) => ({
-        id: m.guild.id,
-        name: m.guild.name,
-        iconColor: m.guild.iconColor,
-        ownerId: m.guild.ownerId,
-        memberCount: m.guild._count.members,
-        channels: m.guild.channels,
-      })),
+      guilds: memberships
+        .map((m) => byId.get(m.guildId))
+        .filter(Boolean)
+        .map((guild) => ({
+          id: guild.id,
+          name: guild.name,
+          iconColor: guild.iconColor,
+          ownerId: guild.ownerId,
+          memberCount: memberCounts.get(guild.id) || 0,
+          channels: channelsByGuild.get(guild.id) || [],
+        })),
     });
   });
 
   api.post("/guilds", requireAuth, async (req, res) => {
     const body = z.object({ name: z.string().trim().min(1).max(48) }).parse(req.body);
 
+    const iconColor = AVATAR_COLORS[(Math.random() * AVATAR_COLORS.length) | 0];
+
+    // Создаём последовательными запросами, а не вложенной записью: так меньше
+    // транзакционной работы, и каждый шаг можно безопасно повторить при обрыве
+    // соединения (актуально для serverless-Postgres вроде Neon).
     const guild = await prisma.guild.create({
-      data: {
-        name: body.name,
-        ownerId: req.user.id,
-        iconColor: AVATAR_COLORS[(Math.random() * AVATAR_COLORS.length) | 0],
-        members: { create: { userId: req.user.id } },
-        channels: {
-          create: [
-            { name: "общий", type: "text", position: 0 },
-            { name: "Общий голосовой", type: "voice", position: 1 },
-          ],
-        },
-      },
-      include: { channels: { orderBy: { position: "asc" } } },
+      data: { name: body.name, ownerId: req.user.id, iconColor },
+    });
+
+    try {
+      await prisma.member.create({ data: { userId: req.user.id, guildId: guild.id } });
+      await prisma.channel.createMany({
+        data: [
+          { guildId: guild.id, name: "общий", type: "text", position: 0 },
+          { guildId: guild.id, name: "Общий голосовой", type: "voice", position: 1 },
+        ],
+      });
+    } catch (err) {
+      // Не оставляем «пустой» сервер без каналов.
+      await prisma.guild.delete({ where: { id: guild.id } }).catch(() => {});
+      throw err;
+    }
+
+    const channels = await prisma.channel.findMany({
+      where: { guildId: guild.id },
+      orderBy: { position: "asc" },
     });
 
     bus.emit("guild-created", { userId: req.user.id });
-    res.status(201).json({ guild });
+    res.status(201).json({ guild: { ...guild, channels } });
   });
 
   api.post("/guilds/:guildId/channels", requireAuth, async (req, res) => {

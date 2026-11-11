@@ -115,6 +115,11 @@ class MiniPrisma {
         }
         return self._get("SELECT * FROM Guild ORDER BY createdAt ASC LIMIT 1");
       },
+      async findMany({ where }) {
+        const ids = where && where.id && Array.isArray(where.id.in) ? where.id.in : null;
+        const rows = self._all("SELECT * FROM Guild ORDER BY createdAt ASC");
+        return ids ? rows.filter((g) => ids.includes(g.id)) : rows;
+      },
       async create({ data, include }) {
         const row = {
           id: cuid(),
@@ -183,9 +188,21 @@ class MiniPrisma {
         );
       },
       async findMany({ where, include }) {
-        const rows = self._all("SELECT * FROM Member WHERE userId = ? ORDER BY joinedAt ASC", [
-          where.userId,
-        ]);
+        let rows;
+        if (where && where.guildId && Array.isArray(where.guildId.in)) {
+          const ids = where.guildId.in;
+          rows = self
+            ._all("SELECT * FROM Member ORDER BY joinedAt ASC")
+            .filter((m) => ids.includes(m.guildId));
+        } else if (where && where.userId) {
+          rows = self._all(
+            "SELECT * FROM Member WHERE userId = ? ORDER BY joinedAt ASC",
+            [where.userId]
+          );
+        } else {
+          rows = self._all("SELECT * FROM Member ORDER BY joinedAt ASC");
+        }
+        if (!include) return rows;
         return rows.map((m) => {
           const guild = self._get("SELECT * FROM Guild WHERE id = ?", [m.guildId]);
           const out = { ...m, guild };
@@ -231,6 +248,23 @@ class MiniPrisma {
           [row.id, row.guildId, row.name, row.type, row.position, row.createdAt]
         );
         return row;
+      },
+      async findMany({ where, orderBy }) {
+        const ids = where && where.guildId && Array.isArray(where.guildId.in) ? where.guildId.in : null;
+        const order = orderBy && orderBy.position === "desc" ? "DESC" : "ASC";
+        const rows = self._all(`SELECT * FROM Channel ORDER BY position ${order}`);
+        return ids ? rows.filter((ch) => ids.includes(ch.guildId)) : rows;
+      },
+      async createMany({ data }) {
+        let count = 0;
+        for (const item of data) {
+          self._run(
+            "INSERT INTO Channel (id, guildId, name, type, position, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
+            [cuid(), item.guildId, item.name, item.type || "text", item.position || 0, nowIso()]
+          );
+          count++;
+        }
+        return { count };
       },
     };
   }
