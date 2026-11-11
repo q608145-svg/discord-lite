@@ -4,6 +4,7 @@
 // игнорируя атрибут Secure (в проверках используется http://localhost).
 
 const http = require("node:http");
+const https = require("node:https");
 
 class Client {
   constructor(base) {
@@ -26,11 +27,13 @@ class Client {
     const cookie = this.cookieHeader();
     if (cookie) headers.cookie = cookie;
 
+    const transport = url.protocol === "https:" ? https : http;
+
     return new Promise((resolve, reject) => {
-      const req = http.request(
+      const req = transport.request(
         {
           hostname: url.hostname,
-          port: url.port,
+          port: url.port || undefined,
           path: url.pathname + url.search,
           method,
           headers,

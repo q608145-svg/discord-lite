@@ -202,7 +202,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     15000
   );
   check("Сервер создан и появился в рейле", true);
-  check("Окно закрылось после создания", await evaluate(ws, `!document.querySelector('.dl-overlay')`));
+  // Даём окну закрыться, иначе следующий клик попадёт в ещё открытый диалог.
+  await waitFor(() => evaluate(ws, `!document.querySelector('.dl-overlay')`), 15000);
+  check("Окно закрылось после создания", true);
 
   // 5) Создание текстового канала
   const channelsBefore = await evaluate(ws, `document.querySelectorAll(".channel-item").length`);
@@ -232,6 +234,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   );
   const channelsAfter = await evaluate(ws, `document.querySelectorAll(".channel-item").length`);
   check("Канал создан", channelsAfter === channelsBefore + 1, `${channelsBefore} → ${channelsAfter}`);
+  await waitFor(() => evaluate(ws, `!document.querySelector('.dl-overlay')`), 15000);
 
   // 6) Escape закрывает окно
   await evaluate(ws, `document.querySelector(".guild-btn.add").click(); true`);
